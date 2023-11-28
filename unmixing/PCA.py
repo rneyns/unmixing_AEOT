@@ -5,15 +5,6 @@ import numpy
 from sklearn.decomposition import PCA
 import numpy as np
 
-# Define a function to normalize the PCA output
-def normalize(arr, t_min, t_max):
-    norm_arr = []
-    diff = t_max - t_min
-    diff_arr = max(arr) - min(arr)
-    for i in arr:
-        temp = (((i - min(arr))*diff)/diff_arr) + t_min
-        norm_arr.append(temp)
-    return norm_arr
 
 # Define input and parameters --> replace PATH with the actual path to the file
 def extract_PCA(InputImagery, NumberComponents):
@@ -73,4 +64,4 @@ def extract_PCA(InputImagery, NumberComponents):
       del Output
   
   # Return the resulting image as a HSI CUBE
-  return pca_output.reshape((Image.shape[2],Image.shape[1],NumberComponents))
+  return pca_output.reshape((NumberComponents,Image.shape[1],Image.shape[2])).T
