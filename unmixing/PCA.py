@@ -44,7 +44,7 @@ def extract_PCA(InputImagery, NumberComponents):
       OutputArray = pca_output_reshape[:,:,i]
       
       # Write output
-      OutputNamePath = os.path.join(OutputFolder,'PCA_PC_'+str(i+1)+'.tif')
+      OutputNamePath = 'PCA_PC_'+str(i+1)+'.tif'
       Output = gdal.GetDriverByName('GTiff').Create(OutputNamePath,Image.shape[2],Image.shape[1],1,gdal.GDT_Float64)
       Output.SetProjection(prj)
       Output.SetGeoTransform(extent)
