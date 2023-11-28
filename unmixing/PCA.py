@@ -47,7 +47,7 @@ def extract_PCA(InputImagery, NumberComponents):
   pca_output = pca.fit_transform(Image_2D)
 
   #normalize the PCA's
-  for i in range(len(Image_2D[1,:])):
+  for i in range(NumberComponents):
     pca_output[:,i] = normalize(pca_output[:,i],0,100)
   
   # Reshape PCA output
