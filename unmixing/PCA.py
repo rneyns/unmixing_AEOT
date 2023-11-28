@@ -11,7 +11,7 @@ def extract_PCA(Image, NumberComponents):
 
   # Adapt shape from (bands, row, col) to (row, col,bands)
   Image_AdaptedAxisOrder =  numpy.moveaxis(Image,0,-1)
-  print(Image_AdaptedAxisOrder)
+  print(Image_AdaptedAxisOrder.shape)
   
   # Adapt shape from 3D to 2D; new shape = (row * col, bands)
   Image_2D = Image_AdaptedAxisOrder[:, :, :].reshape((Image.shape[1] * Image.shape[2],Image.shape[0]))
