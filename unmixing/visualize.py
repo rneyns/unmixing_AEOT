@@ -333,9 +333,6 @@ class FeatureSpace(LSMAPlot):
 
         plt.xlabel(xtpl % (m + 1), fontsize=14)
         plt.ylabel(ytpl % (n + 1), fontsize=14)
-        plt.suptitle(stitle % (m + 1, n + 1),
-            fontsize=18, fontweight='bold')
-        plt.title(t, fontsize=16)
 
         if not hold:
             plt.show()
