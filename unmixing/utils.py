@@ -49,7 +49,7 @@ def endmember_x_y_from_csv(csv_path):
     y = df["y"]
     coordinates = []
     for i in range(len(x)):
-        coordinates.append([x[i],y[i])
+        coordinates.append([x[i],y[i]])
     return coordinates
 
 def as_array(path, band_axis=True):
