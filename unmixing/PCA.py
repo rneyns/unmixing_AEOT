@@ -4,6 +4,16 @@ from osgeo import gdal
 import numpy
 from sklearn.decomposition import PCA
 
+# Define a function to normalize the PCA output
+def normalize(arr, t_min, t_max):
+    norm_arr = []
+    diff = t_max - t_min
+    diff_arr = max(arr) - min(arr)
+    for i in arr:
+        temp = (((i - min(arr))*diff)/diff_arr) + t_min
+        norm_arr.append(temp)
+    return norm_arr
+
 # Define input and parameters --> replace PATH with the actual path to the file
 def extract_PCA(InputImagery, NumberComponents):
 
@@ -35,6 +45,10 @@ def extract_PCA(InputImagery, NumberComponents):
   
   # Apply PCA
   pca_output = pca.fit_transform(Image_2D)
+
+  #normalize the PCA's
+  for i in range(len(Image_2D[1,:])):
+    pca_output[:,i] = normalize(pca_output[:,I],0,100)
   
   # Reshape PCA output
   pca_output_reshape = pca_output.reshape((Image.shape[1],Image.shape[2],NumberComponents))
