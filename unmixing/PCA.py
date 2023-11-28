@@ -3,6 +3,7 @@ import os
 from osgeo import gdal
 import numpy
 from sklearn.decomposition import PCA
+import numpy as np
 
 # Define a function to normalize the PCA output
 def normalize(arr, t_min, t_max):
@@ -48,7 +49,12 @@ def extract_PCA(InputImagery, NumberComponents):
 
   #normalize the PCA's
   for i in range(NumberComponents):
-    pca_output[:,i] = normalize(pca_output[:,i],0,100)
+    # Min-Max scaling
+    data = np.array(pca_output[:,i])
+    min_val = np.min(data)
+    max_val = np.max(data)
+    scaled_data = ((data - min_val) / (max_val - min_val))*100
+    pca_output[:,i] = scaled_data
   
   # Reshape PCA output
   pca_output_reshape = pca_output.reshape((Image.shape[1],Image.shape[2],NumberComponents))
