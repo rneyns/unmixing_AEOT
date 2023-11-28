@@ -41,6 +41,16 @@ import numpy as np
 from concurrent.futures import ProcessPoolExecutor
 from functools import partial
 from osgeo import gdal, gdalconst, gdal_array, gdalnumeric, ogr, osr
+import pandas as pd
+
+def endmember_x_y_from_csv(csv_path):
+    df = pd.read_csv(csv_path)
+    x = df["x"]
+    y = df["y"]
+    coordinates = []
+    for i in range(len(x)):
+        coordinates.append([x[i],y[i])
+    return coordinates
 
 def as_array(path, band_axis=True):
     '''
