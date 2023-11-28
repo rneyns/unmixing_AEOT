@@ -9,9 +9,9 @@ import os
 import re
 import numpy as np
 import pysptools.util as sp_utils
-from unmixing.transform import mnf_rotation
-from unmixing.lsma import point_to_pixel_geometry, ravel_and_filter
-from unmixing.utils import as_array, binary_mask, pixel_to_geojson, pixel_to_xy, xy_to_pixel, spectra_at_xy, subarray
+from unmixing_AEOT.unmixing.transform import mnf_rotation
+from unmixing_AEOT.unmixing.lsma import point_to_pixel_geometry, ravel_and_filter
+from unmixing_AEOT.unmixing.utils import as_array, binary_mask, pixel_to_geojson, pixel_to_xy, xy_to_pixel, spectra_at_xy, subarray
 from osgeo import gdal, ogr, osr
 from pylab import plt, figure
 from matplotlib.path import Path as VectorPath
