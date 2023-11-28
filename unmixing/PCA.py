@@ -64,4 +64,4 @@ def extract_PCA(InputImagery, NumberComponents):
       del Output
   
   # Return the resulting image as a HSI CUBE
-  return pca_output.reshape((NumberComponents,Image.shape[1],Image.shape[2])).T
+  return np.transpose(pca_output_reshape, (1,0, 2))
