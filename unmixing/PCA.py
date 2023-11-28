@@ -9,15 +9,9 @@ import numpy as np
 # Define input and parameters --> replace PATH with the actual path to the file
 def extract_PCA(InputImagery, NumberComponents):
 
-  # Read imagery
-  Image = gdal.Open(InputImagery).ReadAsArray()
-  
-  # Get imagery information
-  prj = gdal.Open(InputImagery).GetProjectionRef()
-  extent = gdal.Open(InputImagery).GetGeoTransform()
   
   # Adapt shape from (bands, row, col) to (row, col,bands)
-  Image_AdaptedAxisOrder = numpy.moveaxis(Image,0,-1)
+  Image_AdaptedAxisOrder = np.transpose(InputImagery, (1,2, 0))
   
   # Adapt shape from 3D to 2D; new shape = (row * col, bands)
   Image_2D = Image_AdaptedAxisOrder[:, :, :].reshape((Image.shape[1] * Image.shape[2],Image.shape[0]))
@@ -49,19 +43,6 @@ def extract_PCA(InputImagery, NumberComponents):
   
   # Reshape PCA output
   pca_output_reshape = pca_output.reshape((Image.shape[1],Image.shape[2],NumberComponents))
-
-  # Write output
-  for i in range (0,NumberComponents):
-      OutputArray = pca_output_reshape[:,:,i]
-      
-      # Write output
-      OutputNamePath = 'PCA_PC_'+str(i+1)+'.tif'
-      Output = gdal.GetDriverByName('GTiff').Create(OutputNamePath,Image.shape[2],Image.shape[1],1,gdal.GDT_Float64)
-      Output.SetProjection(prj)
-      Output.SetGeoTransform(extent)
-      Output.GetRasterBand(1).WriteArray(OutputArray)
-      Output.GetRasterBand(1).SetNoDataValue(-9999)
-      del Output
   
   # Return the resulting image as a HSI CUBE
   return np.transpose(pca_output_reshape, (1,0, 2))
