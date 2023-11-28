@@ -7,11 +7,10 @@ import numpy as np
 
 
 # Define input and parameters --> replace PATH with the actual path to the file
-def extract_PCA(InputImagery, NumberComponents):
+def extract_PCA(Image, NumberComponents):
 
-  
   # Adapt shape from (bands, row, col) to (row, col,bands)
-  Image_AdaptedAxisOrder = np.transpose(InputImagery, (1,2, 0))
+  Image_AdaptedAxisOrder =  numpy.moveaxis(Image,0,-1)
   
   # Adapt shape from 3D to 2D; new shape = (row * col, bands)
   Image_2D = Image_AdaptedAxisOrder[:, :, :].reshape((Image.shape[1] * Image.shape[2],Image.shape[0]))
