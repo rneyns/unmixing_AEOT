@@ -29,8 +29,8 @@ import re
 import numpy as np
 from concurrent.futures import ProcessPoolExecutor
 from functools import reduce, partial, wraps
-from unmixing.transform import mnf_rotation
-from unmixing.utils import array_to_raster, as_array, as_raster, dump_raster, partition, xy_to_pixel, pixel_to_xy, spectra_at_xy, rmse
+from unmixing_AEOT.unmixing.transform import mnf_rotation
+from unmixing_AEOT.unmixing.utils import array_to_raster, as_array, as_raster, dump_raster, partition, xy_to_pixel, pixel_to_xy, spectra_at_xy, rmse
 from lxml import etree
 from osgeo import gdal, ogr, osr
 from pykml.factory import KML_ElementMaker as KML
