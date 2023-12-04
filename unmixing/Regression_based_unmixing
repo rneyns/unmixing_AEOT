@@ -94,7 +94,7 @@ def regression_based_unmixing(sythetic_samples,class_labels, hsi, classes=['Impe
     print(f'Mean Absolute Error: {mae}')
     
     # Adapt shape from (bands, row, col) to (row, col,bands)
-    Image_AdaptedAxisOrder =  np.moveaxis(hsi.T,0,-1)
+    Image_AdaptedAxisOrder =  np.moveaxis(hsi,0,-1)
     
     # Adapt shape from 3D to 2D; new shape = (row * col, bands)
     Image_2D = Image_AdaptedAxisOrder[:, :, :].reshape((hsi.shape[1] * hsi.shape[2], hsi.shape[0]))
