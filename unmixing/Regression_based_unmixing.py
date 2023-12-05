@@ -58,13 +58,13 @@ def generate_synthetic_dataset_random_class_mixing(endmember_training_set, num_s
     return synthetic_samples, class_labels
 
 
-def regression_based_unmixing(sythetic_samples,class_labels, hsi, classes=['Impervious','Vegetation','Soil']):
+def regression_based_unmixing(synthetic_samples,class_labels, hsi, classes=['Impervious','Vegetation','Soil']):
     
     """
     Train a classifier on a set of labeled mixed pixels and apply the classifier to the image to be unmixed
 
     Parameters:
-    - sythetic_samples: The relectivity values of the samples on which the classifier should be trained
+    - synthetic_samples: The relectivity values of the samples on which the classifier should be trained
     - Class_labels: The labels associated with these synthetic samples (an array with a percentage of cover per class)
     - Hsi: the actual raster 
     - Classes: The array with classes present in the dataset, in the right order
