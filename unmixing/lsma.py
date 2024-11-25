@@ -329,7 +329,30 @@ def combine_endmembers_and_normalize(
     rast = None
     return np.vstack(comps)
 
+def sort_points_ccw(points):
+    """
+    Reorder a list of points (x, y) into Counter-Clockwise (CCW) order.
 
+    Args:
+        points (list of tuples): List of (x, y) coordinates.
+
+    Returns:
+        list of tuples: Points sorted in CCW order.
+    """
+    # Step 1: Find the centroid of the points
+    centroid_x = sum(p[0] for p in points) / len(points)
+    centroid_y = sum(p[1] for p in points) / len(points)
+    
+    # Step 2: Calculate the angle of each point relative to the centroid
+    def angle_from_centroid(point):
+        x, y = point
+        return math.atan2(y - centroid_y, x - centroid_x)
+    
+    # Step 3: Sort the points based on the angle
+    points_sorted = sorted(points, key=angle_from_centroid)
+    
+    return points_sorted
+    
 def convex_hull_graham(points, indices=False):
     '''
     Returns points on convex hull of an array of points in CCW order according
