@@ -382,9 +382,9 @@ def convex_hull_graham(points, indices=False):
     hull = l.extend(u[i] for i in range(1, len(u) - 1)) or l
 
     if indices:
-        return ([points.index(h) for h in hull], hull)
+        return ([points.index(h) for h in hull], np.array(hull))
 
-    return hull
+    return np.array(hull)
 
 
 def endmembers_by_maximum_angle(
