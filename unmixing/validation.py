@@ -38,7 +38,10 @@ def GetNoNaNValues(ArrayRef,ArrayPred):
 
 def validation(Reference, Prediction, band_num):
   Ref = gdal.Open(Reference).ReadAsArray()
-  Pred = gdal.Open(Prediction).ReadAsArray()[band_num-1]
+  Pred = gdal.Open(Prediction).ReadAsArray()
+    
+  if len(Pred.shape) > 2:
+      Pred = Pred[band_num-1]
   
   print(Ref.shape)
   print(Pred.shape)
