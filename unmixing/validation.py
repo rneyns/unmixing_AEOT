@@ -40,8 +40,8 @@ def validation(Reference, Prediction, band_num):
   Ref = gdal.Open(Reference).ReadAsArray()
   Pred = gdal.Open(Prediction).ReadAsArray()[band_num-1]
   
-  print(Ref.shape[0])
-  print(Pred.shape[0])
+  print(Ref.shape)
+  print(Pred.shape)
   
   # Check for shape
   if Ref.shape[0] == Pred.shape[0]:
