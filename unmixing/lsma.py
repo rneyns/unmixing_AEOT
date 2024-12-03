@@ -38,6 +38,8 @@ import pysptools.eea as sp_extract
 import pysptools.abundance_maps as sp_abundance
 import pysptools.classification as sp_classify
 import pysptools.material_count as sp_matcount
+from itertools import combinations
+
 
 class AbstractAbundanceMapper(object):
     def __init__(self, mixed_raster, gt, wkt, nodata=-9999, processes=1):
@@ -121,6 +123,7 @@ class PPI(sp_extract.PPI, AbstractExtractor):
 
 class NFINDR(sp_extract.NFINDR, AbstractExtractor):
     pass
+
 
 
 class FCLSAbundanceMapper(AbstractAbundanceMapper):
@@ -229,6 +232,7 @@ class FCLSAbundanceMapper(AbstractAbundanceMapper):
         return np.concatenate(combined_result, axis = 1)\
             .reshape((shp[0], shp[1], q))
 
+
     def validate_by_forward_model(
             self, ref_image, abundances, ref_spectra=None,
             ref_em_locations=None, dd=False, nodata=-9999, r=10000,
@@ -295,6 +299,252 @@ class FCLSAbundanceMapper(AbstractAbundanceMapper):
             return str(round(rmse_value / norm * 100, 2)) + '%'
 
         return round(rmse_value / norm, 2)
+
+class FCLSAbundanceMapperBeta(AbstractAbundanceMapper):
+    '''
+    A class for generating an abundance map, containing both the raw spectral
+    (mixed) data and the logic to unmix the data into an abundance map with
+    the fully constrained least-squares (FCLS) approach. The "full"
+    constraints are the sum-to-one and non-negativity constraints. Given
+    q endmembers and p spectral bands, the mapper is forced to find
+    abundances within a simplex in a (q-1)-dimensional subspace.
+    NOTE: The mixed_raster provided in instantation is assumed to correspond
+    exactly to the mixing space used to induce endmembers; if mixed_raster
+    was MNF- or PCA-transformed, for instance, the endmember spectra provided
+    in, e.g., map_abundances(), must match this transformation exactly.
+    Arguments:
+        mixed_raster    The raster to be unmixed; should NOT be in HSI form
+                        but should be MNF- or PCA-transformed to match any
+                        endmember spectra provided
+        gt              A GDAL GeoTransform tuple for the mixed_raster
+        wkt             Projection information as Well-Known Text for the
+                        mixed_raster
+        nodata          The NoData value for mixed_raster
+        processes       The number of processes to create in mixture analysis
+    '''
+    def __init__(self, *args, **kwargs):
+        super(FCLSAbundanceMapper, self).__init__(*args, **kwargs)
+        self.mapper = sp_abundance.FCLS()
+
+    def __lsma__(self, cases, endmembers):
+        # For regular LSMA with single endmember spectra
+        # c is number of pixels, k is number of bands
+        c, k = cases.shape if len(cases.shape) > 1 else (1, cases.shape[0])
+        return self.mapper.map(cases.reshape((1, c, k)), endmembers,
+            normalize = False)
+
+    def __mesma__(self, array_pairs):
+        # For multiple endmember spectra, in chunks
+        cases, endmembers = array_pairs
+        # c is number of pixels, k is number of bands
+        c, k = cases.shape if len(cases.shape) > 1 else (1, cases.shape[0])
+        return [
+            self.mapper.map(cases[i,...].reshape((1, 1, k)), endmembers[i,...],
+                normalize = False) for i in range(0, c)
+        ]
+
+    def __mesma2__(self, array_pairs):
+        # For multiple endmember spectra, pixel-wise
+        # NOTE: This pixel-wise implementation might be slower than __mesma__
+        #   for large arrays
+        cases, endmembers = array_pairs
+        # c is number of pixels, k is number of bands
+        c, k = cases.shape if len(cases.shape) > 1 else (1, cases.shape[0])
+        return self.mapper.map(cases.reshape((1, c, k)), endmembers,
+            normalize = False)
+
+    def map_abundance(self, endmembers, pixelwise=False):
+        '''
+        Arguments:
+            endmembers  A numpy.ndarray of endmembers; either (q x p) array
+                        of q endmembers and p bands (for regular LSMA) or a
+                        (c x q x p) array, where c = m*n, for multiple
+                        endmember spectra for each pixel.
+
+        Returns: An (m x n x q) numpy.ndarray (in HSI form) that contains
+        the abundances for each of q endmember types.
+        '''
+        q = endmembers.shape[-2]
+        # FCLS with the sum-to-one constraint has an extra degree of freedom so it
+        #   is able to form a simplex of q corners in (q-1) dimensions:
+        #   q <= n (Settle and Drake, 1993)
+        k = q - 1 # Find q corners of simplex in (q-1) dimensions
+        endmembers = endmembers[...,0:k]
+        shp = self.hsi.shape
+        base_array = self.hsi[:,:,0:k].reshape((shp[0] * shp[1], k))
+
+        # Get indices for each process' work range
+        work = partition(base_array, self.num_processes, axis=0)
+
+        with ProcessPoolExecutor(max_workers = self.num_processes) as executor:
+            # We're working with multiple endmembers
+            if endmembers.ndim == 3 and pixelwise:
+                result = executor.map(self.__mesma2__, [ # Work done pixel-wise
+                    (base_array[i,...], endmembers[i,...]) for i in range(0, base_array.shape[0])
+                ])
+
+            elif endmembers.ndim == 3:
+                result = executor.map(self.__mesma__, [
+                    (base_array[i:j,...], endmembers[i:j,...]) for i, j in work
+                ])
+
+            # We're working with a single endmember per class
+            else:
+                # Curry an unmixing function with the present endmember array
+                unmix = partial(self.__lsma__, endmembers = endmembers)
+                result = executor.map(unmix, [
+                    base_array[i:j,...] for i, j in work
+                ])
+
+        combined_result = list(result) # Executes the multiprocess suite
+        if endmembers.ndim == 3 and not pixelwise:
+            # When chunking with multiple endmembers, we get list of lists
+            ext_array = [y for x in combined_result for y in x] # Flatten once
+            return np.concatenate(ext_array, axis = 1)\
+                .reshape((shp[0], shp[1], q))
+
+        return np.concatenate(combined_result, axis = 1)\
+            .reshape((shp[0], shp[1], q))
+
+    def perform_unmixing(self, pixel_spectrum, endmembers):
+    """
+    Perform FCLS-based unmixing for a single pixel and a set of endmembers.
+    """
+    c, k = 1, pixel_spectrum.shape[0]  # Single pixel (1 x k)
+    return self.mapper.map(pixel_spectrum.reshape((1, c, k)), endmembers, normalize=False)
+
+    def reconstruct_spectrum(self, endmembers, abundances):
+        """
+        Reconstruct the pixel spectrum from abundances and endmembers.
+        """
+        return np.dot(abundances, endmembers)
+
+    def calculate_rmse(self, observed_spectrum, reconstructed_spectrum):
+        """
+        Calculate RMSE between the observed and reconstructed spectrum.
+        """
+        return np.sqrt(np.mean((observed_spectrum - reconstructed_spectrum) ** 2))
+
+    def standard_mesma(self, pixel_spectrum, endmember_library, r=2):
+        """
+        Perform standard MESMA for a single pixel.
+
+        Args:
+            pixel_spectrum (numpy.ndarray): Spectrum of the pixel (1D array, shape (k,))
+            endmember_library (numpy.ndarray): Library of endmembers (shape (q, k))
+            r (int): Number of endmembers to test in combinations (e.g., 2, 3, etc.)
+
+        Returns:
+            tuple: Best combination of endmembers, abundances, and error
+        """
+        best_error = float('inf')
+        best_abundances = None
+        best_combination = None
+
+        # Iterate over all combinations of endmembers of size r
+        for combination in combinations(endmember_library, r=r):
+            combination_array = np.array(combination)  # (r x k)
+            abundances = self.perform_unmixing(pixel_spectrum, combination_array)
+            reconstructed_spectrum = self.reconstruct_spectrum(combination_array, abundances.squeeze())
+            error = self.calculate_rmse(pixel_spectrum, reconstructed_spectrum)
+
+            if error < best_error:
+                best_error = error
+                best_abundances = abundances.squeeze()
+                best_combination = combination_array
+
+        return best_combination, best_abundances, best_error
+
+    def map_abundance_mesma(self, endmember_library, r=2):
+        """
+        Perform MESMA on the entire raster.
+
+        Args:
+            endmember_library (numpy.ndarray): Library of endmembers (shape (q, k))
+            r (int): Number of endmembers to test in combinations (e.g., 2, 3, etc.)
+
+        Returns:
+            numpy.ndarray: Abundance map for the entire raster (m x n x r array)
+        """
+        shp = self.hsi.shape  # (m x n x k)
+        base_array = self.hsi.reshape((-1, shp[-1]))  # Flatten raster to (m*n x k)
+
+        abundance_map = []
+        for pixel_spectrum in base_array:
+            _, abundances, _ = self.standard_mesma(pixel_spectrum, endmember_library, r=r)
+            abundance_map.append(abundances)
+
+        abundance_map = np.array(abundance_map)
+        return abundance_map.reshape((shp[0], shp[1], r))
+
+
+    def validate_by_forward_model(
+            self, ref_image, abundances, ref_spectra=None,
+            ref_em_locations=None, dd=False, nodata=-9999, r=10000,
+            as_pct=True, convert_nodata=False):
+        '''
+        Validates LSMA result in the forward model of reflectance, i.e.,
+        compares the observed reflectance in the original (mixed) image to the
+        abundance predicted by a forward model of reflectance using the
+        provided endmember spectra. NOTE: Does not apply in the case of
+        multiple endmember spectra; requires only one spectral profile per
+        endmember type.
+        Arguments:
+            ref_image   A raster array of the reference spectra (not MNF-
+                        transformed data).
+            abundances  A raster array of abundances; a (q x m x n) array for
+                        q abundance types (q endmembers).
+            ref_spectra With single endmember spectra, user can provide the
+                        reference spectra, e.g., the observed reflectance for
+                        each endmember (not MNF spectra).
+            ref_em_locations With single endmember spectra, user can provide
+                        the coordinates of each endmember, so that reference
+                        spectra can be extracted for validation.
+            dd          True if ref_em_locations provided and the coordinates
+                        are in decimal degrees.
+            nodata      The NoData value to use.
+            r           The number of random samples to take in calculating
+                        RMSE.
+            as_pct      Report normalized RMSE (as a percentage).
+            convert_nodata
+                        True to convert all NoData values to zero (as in zero
+                        reflectance)
+        '''
+        rastr = ref_image.copy()
+        assert (ref_spectra is not None) or (ref_em_locations is not None), 'When single endmember spectra are used, either ref_spectra or ref_em_locations must be provided'
+
+        if ref_spectra is not None:
+            assert ref_spectra.shape[0] == abundances.shape[0], 'One reference spectra must be provided for each endmember type in abundance map'
+
+        else:
+            # Get the spectra for each endmember from the reference dataset
+            ref_spectra = spectra_at_xy(ref_image, ref_em_locations,
+                self.gt, self.wkt, dd = dd)
+
+        # Convert the NoData values to zero reflectance
+        if convert_nodata:
+            rastr[rastr == nodata] = 0
+            ref_spectra[ref_spectra == nodata] = 0
+
+        shp = rastr.shape # Reshape the arrays
+        arr = rastr.reshape((shp[0], shp[1]*shp[2]))
+        # Generate random sampling indices
+        idx = np.random.choice(np.arange(0, arr.shape[1]), r)
+        # Get the predicted reflectances
+        preds = predict_spectra_from_abundance(ravel(abundances), ref_spectra)
+        assert preds.shape == arr.shape, 'Prediction and observation matrices are not the same size'
+
+        # Take the mean RMSE (sum of RMSE divided by number of pixels), after
+        #   the residuals are normalized by the number of endmembers
+        rmse_value = rmse(arr, preds, idx, n = ref_spectra.shape[0], nodata = nodata).sum() / r
+        norm = 1
+        if as_pct:
+            # Divide by the range of the measured data; minimum is zero
+            norm = arr.max()
+            return str(round(rmse_value / norm * 100, 2)) + '%'
+
+        return round(rmse_value / norm, 2)
+
 
 
 def combine_endmembers_and_normalize(
